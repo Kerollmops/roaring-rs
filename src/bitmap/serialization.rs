@@ -172,4 +172,73 @@ impl RoaringBitmap {
 
         Ok(RoaringBitmap { containers })
     }
+
+    pub fn deserialize_from_slice(slice: &[u8]) -> io::Result<RoaringBitmap> {
+        use std::io::{Cursor, Seek, SeekFrom};
+        use std::mem;
+
+        let mut reader = Cursor::new(slice);
+
+        let (size, has_offsets) = {
+            let cookie = reader.read_u32::<LittleEndian>()?;
+            if cookie == SERIAL_COOKIE_NO_RUNCONTAINER {
+                (reader.read_u32::<LittleEndian>()? as usize, true)
+            } else if (cookie as u16) == SERIAL_COOKIE {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "run containers are unsupported",
+                ));
+            } else {
+                return Err(io::Error::new(io::ErrorKind::Other, "unknown cookie value"));
+            }
+        };
+
+        if size > u16::max_value() as usize {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "size is greater than supported",
+            ));
+        }
+
+        let pos = reader.position() as usize;
+        let description_bytes = &slice[pos..pos + (size * 4)];
+        let description_bytes = &mut &description_bytes[..];
+        reader.seek(SeekFrom::Current((size * 4) as i64))?;
+
+        if has_offsets {
+            reader.seek(SeekFrom::Current((size * 4) as i64))?;
+        }
+
+        let mut containers = Vec::with_capacity(size);
+
+        for _ in 0..size {
+            let key = description_bytes.read_u16::<LittleEndian>()?;
+            let len = u64::from(description_bytes.read_u16::<LittleEndian>()?) + 1;
+
+            let store = if len < 4096 {
+                let pos = reader.position() as usize;
+                let byte_slice = &slice[pos..pos + len as usize];
+                let slice: &[u16] = unsafe { mem::transmute(byte_slice) };
+                reader.seek(SeekFrom::Current(len as i64 * 2))?;
+
+                Store::Array(slice.to_vec())
+            } else {
+                let mut values = Box::new([0u64; 1024]);
+
+                let len = 1024;
+                let pos = reader.position() as usize;
+                let byte_slice: &[u8] = &slice[pos..pos + len];
+                let slice: &[u64] = unsafe { mem::transmute(byte_slice) };
+                values.as_mut().copy_from_slice(slice);
+
+                reader.seek(SeekFrom::Current(len as i64 * 8))?;
+
+                Store::Bitmap(values)
+            };
+
+            containers.push(Container { key, len, store });
+        }
+
+        Ok(RoaringBitmap { containers })
+    }
 }

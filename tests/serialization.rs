@@ -32,6 +32,14 @@ fn test_deserialize_from_provided_data() {
 }
 
 #[test]
+fn test_deserialize_from_slice_provided_data() {
+    assert_eq!(
+        RoaringBitmap::deserialize_from_slice(&mut &BITMAP_WITHOUT_RUNS[..]).unwrap(),
+        test_data_bitmap()
+    );
+}
+
+#[test]
 fn test_serialize_into_provided_data() {
     let bitmap = test_data_bitmap();
     let mut buffer = vec![];
