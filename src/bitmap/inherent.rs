@@ -2,6 +2,7 @@ use crate::RoaringBitmap;
 
 use super::container::Container;
 use super::util;
+use std::mem;
 use std::ops::Range;
 
 impl RoaringBitmap {
@@ -206,6 +207,13 @@ impl RoaringBitmap {
     /// ```
     pub fn len(&self) -> u64 {
         self.containers.iter().map(|container| container.len).sum()
+    }
+
+    /// Returns the amount of memory allocated on heap.
+    pub fn mem_usage(&self) -> usize {
+        let sum: usize = self.containers.iter().map(|container| container.mem_usage()).sum();
+        let capacity = self.containers.len() * mem::size_of::<Container>();
+        sum + capacity
     }
 
     /// Returns the minimum value in the set (if the set is non-empty).

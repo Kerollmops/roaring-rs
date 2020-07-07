@@ -1,5 +1,6 @@
 use std::borrow::Borrow;
 use std::cmp::Ordering::{Equal, Greater, Less};
+use std::mem;
 use std::slice;
 use std::vec;
 
@@ -370,6 +371,13 @@ impl Store {
         match *self {
             Array(ref vec) => vec.len() as u64,
             Bitmap(ref bits) => bits.iter().map(|bit| u64::from(bit.count_ones())).sum(),
+        }
+    }
+
+    pub fn mem_usage(&self) -> usize {
+        match self {
+            Array(vec) => vec.capacity() * mem::size_of::<u16>(),
+            Bitmap(bits) => bits.len() * mem::size_of::<u64>(),
         }
     }
 

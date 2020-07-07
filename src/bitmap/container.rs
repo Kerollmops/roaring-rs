@@ -103,6 +103,10 @@ impl Container {
         self.store.max()
     }
 
+    pub fn mem_usage(&self) -> usize {
+        self.store.mem_usage()
+    }
+
     fn ensure_correct_store(&mut self) {
         let new_store = match (&self.store, self.len) {
             (store @ &Store::Bitmap(..), len) if len <= ARRAY_LIMIT => Some(store.to_array()),
